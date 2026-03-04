@@ -1,0 +1,108 @@
+---
+- name: Check Polycom VC Status via Session-Based REST API (Secure)
+  hosts: polycom_host
+  gather_facts: no
+  connection: local
+
+  # CRITICAL: This directive loads 'polycom_user' and 'polycom_password'
+  # from the encrypted file '/home/ybagga/Ansible_Project2/secret.yml'.
+  # for PNQ T6- Orchid
+  vars_files:
+    - /home/ybagga/Ansible_Project2/secret2.yml
+
+
+  tasks:
+    - name: 1. Login - POST Credentials to Get Session Cookie
+      ansible.builtin.uri:
+        url: "https://{{ inventory_hostname }}/rest/session"
+        method: POST
+        body_format: json
+        body: '{ "user": "{{ polycom_user }}", "password": "{{ polycom_password }}" }'
+        validate_certs: no
+        status_code: 200
+        headers:
+          Content-Type: "application/json"
+      register: login_response
+
+    - name: 2. Get System Status using the Session Cookie
+      ansible.builtin.uri:
+        url: "https://{{ inventory_hostname }}/rest/system"
+        method: GET
+        validate_certs: no
+        return_content: yes
+        status_code: 200
+        # CRITICAL: Using the discovered 'session_id' cookie for authorization
+        headers:
+          Cookie: "session_id={{ login_response.cookies.session_id }}"
+      register: system_status_result
+
+
+    - name: 3. Display Parsed System Status
+      ansible.builtin.debug:
+        msg: |
+          ✅ Poly Studio X30 Status - {{ system_status_result.json.state }}
+          ---------------------------------------
+          Software Version: {{ system_status_result.json.softwareVersion }}
+          System Name: {{ system_status_result.json.systemName }}
+          Uptime: {{ system_status_result.json.uptime | int / 3600 | round(2) }} hours
+          Network Link: {{ system_status_result.json.lanStatus.state }} ({{ system_status_result.json.lanStatus.speedMbps }} Mbps)
+      when: system_status_result is success
+
+    - name: 4. Send Device Health Status to Grafana
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/annotations"
+        method: POST
+        headers: 
+          Authorization: "Bearer {{ grafana_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          text: |
+            <b>System Name:</b> {{ system_status_result.json.systemName }}<br>
+            <b>Device Status:</b> {{ system_status_result.json.state }}<br>
+            <b>Software:</b> {{ system_status_result.json.softwareVersion }}<br>
+            <b>Uptime:</b> {{ (system_status_result.json.uptime | int / 3600) | round(2) }} hours<br>
+            <b>Network:</b> {{ system_status_result.json.lanStatus.speedMbps }} Mbps
+          tags:
+            - "Polycom"
+            - "FullHealth"
+        status_code: 200
+      when: system_status_result is success
+
+    - name: 5. Prompt for Action
+      ansible.builtin.pause:
+        prompt: "Type 'y' to REBOOT. Press any other key to EXIT safely."
+      register: user_selection
+
+    - name: 6. Exit Gracefully if not 'y'
+      ansible.builtin.meta: end_play
+      when: user_selection.user_input | lower != 'y'
+
+    - name: 7. Execute Reboot
+      ansible.builtin.uri:
+        url: "https://{{ inventory_hostname }}/rest/system/reboot"
+        method: POST
+        body_format: json
+        body: {}
+        validate_certs: no
+        headers:
+          Cookie: "session_id={{ login_response.cookies.session_id }}"
+          X-Session-Id: "{{ login_response.cookies.session_id }}"
+      # Only reboot if IDLE or ASLEEP as per your requirement
+      when: system_status_result.json.state in ["IDLE", "ASLEEP"]
+      register: reboot_attempt
+
+    - name: 8. Log Out
+      ansible.builtin.uri:
+        url: "https://{{ inventory_hostname }}/rest/session"
+        method: DELETE
+        validate_certs: no
+        headers:
+          Cookie: "session_id={{ login_response.cookies.session_id }}"
+      when: reboot_attempt is skipped or reboot_attempt is failed
+      ignore_errors: yes
+
+
+
+
+
