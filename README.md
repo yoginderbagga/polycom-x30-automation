@@ -167,8 +167,9 @@ Below web-UI screenshot, shows when the device was not rebooted.
 
 
 
-Part B: Show the results on Grafana Dashboard 
+Part B: Show the results on Grafana Dashboard :
 
+<img width="1920" height="1080" alt="Grafana_Output" src="https://github.com/user-attachments/assets/818c0083-ee65-412f-aa6a-1e0bb79cdaac" />
 
 
 
@@ -176,4 +177,5 @@ Part B: Show the results on Grafana Dashboard
 
 (Polycom WebUI : Login to the webUI interface to verify if the device is UP and running properly.)
 
+<img width="1918" height="957" alt="Screenshot From 2026-03-04 08-45-51" src="https://github.com/user-attachments/assets/ee790651-79fe-4b67-895a-b266b1761205" />
 
