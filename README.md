@@ -160,6 +160,7 @@ pipe 4
 
 Below web-UI screenshot, shows when the device was not rebooted. 
 
+<img width="1918" height="957" alt="Screenshot From 2026-03-04 08-08-32" src="https://github.com/user-attachments/assets/7fc0b6db-1352-4124-b21b-b7c6df7c29df" />
 
 
 
